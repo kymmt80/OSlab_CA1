@@ -192,7 +192,7 @@ void
 consoleintr(int (*getc)(void))
 {
   int c, doprocdump = 0;
-
+  char frst,sec;
   acquire(&cons.lock);
   while((c = getc()) >= 0){
     switch(c){
@@ -218,8 +218,19 @@ consoleintr(int (*getc)(void))
       break;
     case C('T'): // Swap Two Last Chars
       if(input.e != input.w){
-        input.e--;
+        sec=input.buf[--input.e % INPUT_BUF];
         consputc(BACKSPACE);
+        if(input.e != input.w){
+          frst=input.buf[--input.e % INPUT_BUF];
+          consputc(BACKSPACE);
+          input.buf[input.e++ % INPUT_BUF] = sec;
+          consputc(sec);
+          input.buf[input.e++ % INPUT_BUF] = frst;
+          consputc(frst);
+        }else{
+          input.buf[input.e++ % INPUT_BUF] = sec;
+          consputc(sec);
+        }
       }
       break;
     case C('A'):  // New Line
