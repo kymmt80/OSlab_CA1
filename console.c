@@ -213,6 +213,19 @@ consoleintr(int (*getc)(void))
         consputc(BACKSPACE);
       }
       break;
+    case C('O'):  // All Uppercase Before Pointer
+      
+      break;
+    case C('T'): // Swap Two Last Chars
+      if(input.e != input.w){
+        input.e--;
+        consputc(BACKSPACE);
+      }
+      break;
+    case C('A'):  // New Line
+        input.buf[input.e++ % INPUT_BUF] = '\n';
+        consputc('\n');
+      break;
     default:
       if(c != 0 && input.e-input.r < INPUT_BUF){
         c = (c == '\r') ? '\n' : c;
