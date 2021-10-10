@@ -128,6 +128,32 @@ panic(char *s)
 #define CRTPORT 0x3d4
 static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
 
+
+static void
+move_cursor_back(int steps)
+{
+  int pos;
+
+  outb(CRTPORT, 14);
+  pos = inb(CRTPORT+1) << 8;
+  outb(CRTPORT, 15);
+  pos |= inb(CRTPORT+1);
+  if(pos-steps >= 0) pos-=steps;
+  if(pos < 0 || pos > 25*80)
+    panic("pos under/overflow");
+
+  if((pos/80) >= 24){  // Scroll up.
+    memmove(crt, crt+80, sizeof(crt[0])*23*80);
+    pos -= 80;
+    memset(crt+pos, 0, sizeof(crt[0])*(24*80 - pos));
+  }
+  outb(CRTPORT, 14);
+  outb(CRTPORT+1, pos>>8);
+  outb(CRTPORT, 15);
+  outb(CRTPORT+1, pos);
+
+}
+
 static void
 cgaputc(int c)
 {
@@ -159,7 +185,7 @@ cgaputc(int c)
   outb(CRTPORT+1, pos>>8);
   outb(CRTPORT, 15);
   outb(CRTPORT+1, pos);
-  crt[pos] = ' ' | 0x0700;
+  //crt[pos] = ' ' | 0x0700;
 }
 
 void
@@ -184,6 +210,7 @@ struct {
   uint r;  // Read index
   uint w;  // Write index
   uint e;  // Edit index
+  uint last; //Last Character Index
 } input;
 
 #define C(x)  ((x)-'@')  // Control-x
@@ -193,6 +220,9 @@ consoleintr(int (*getc)(void))
 {
   int c, doprocdump = 0;
   char frst,sec;
+  int input_size;
+  uint curr;
+
   acquire(&cons.lock);
   while((c = getc()) >= 0){
     switch(c){
@@ -214,7 +244,19 @@ consoleintr(int (*getc)(void))
       }
       break;
     case C('O'):  // All Uppercase Before Pointer
-      
+      curr=(input.e+1)%INPUT_BUF;
+      move_cursor_back(-1);
+      while(curr!=input.last&&input.buf[curr % INPUT_BUF]!=' '){
+        if(input.buf[curr % INPUT_BUF]>='a'&&input.buf[curr % INPUT_BUF]<='z'){
+          input.buf[curr % INPUT_BUF]-=('a'-'A');
+        }
+          move_cursor_back(-1);
+          consputc(BACKSPACE);
+          consputc(input.buf[curr % INPUT_BUF]);
+          curr=(curr+1)%INPUT_BUF;
+      }
+      input_size=(curr-input.e>0)?curr-input.e:curr-input.e+INPUT_BUF;
+      move_cursor_back(input_size);
       break;
     case C('T'): // Swap Two Last Chars
       if(input.e != input.w){
@@ -233,9 +275,11 @@ consoleintr(int (*getc)(void))
         }
       }
       break;
-    case C('A'):  // New Line
-        input.buf[input.e++ % INPUT_BUF] = '\n';
-        consputc('\n');
+    case C('A'):  // Move to First of Line
+          input.last=input.e;
+          input.e=input.w;
+          input_size=(input.last-input.e>0)?input.last-input.e:input.last-input.e+INPUT_BUF;
+          move_cursor_back(input_size);
       break;
     default:
       if(c != 0 && input.e-input.r < INPUT_BUF){
