@@ -185,7 +185,8 @@ cgaputc(int c)
   outb(CRTPORT+1, pos>>8);
   outb(CRTPORT, 15);
   outb(CRTPORT+1, pos);
-  //crt[pos] = ' ' | 0x0700;
+  if(c==BACKSPACE)
+    crt[pos] = ' ' | 0x0700;
 }
 
 void
@@ -222,7 +223,6 @@ consoleintr(int (*getc)(void))
   char frst,sec;
   int input_size;
   uint curr;
-
   acquire(&cons.lock);
   while((c = getc()) >= 0){
     switch(c){
@@ -239,13 +239,23 @@ consoleintr(int (*getc)(void))
       break;
     case C('H'): case '\x7f':  // Backspace
       if(input.e != input.w){
+        curr=input.e;
+        while(curr!=input.last){
+          input.buf[curr % INPUT_BUF]=input.buf[(curr+1) % INPUT_BUF];
+          consputc(BACKSPACE);
+          consputc(input.buf[(curr) % INPUT_BUF]);
+          move_cursor_back(-1);
+          curr++;
+        }
+          consputc(BACKSPACE);
+        input_size=(input.last-input.e>=0)?input.last-input.e:input.last-input.e+INPUT_BUF;
+        move_cursor_back(input_size);
         input.e--;
-        consputc(BACKSPACE);
+        input.last--;
       }
       break;
-    case C('O'):  // All Uppercase Before Pointer
-      curr=(input.e+1)%INPUT_BUF;
-      move_cursor_back(-1);
+    case C('O'):  // All Uppercase After Pointer
+      curr=(input.e)%INPUT_BUF;
       while(curr!=input.last&&input.buf[curr % INPUT_BUF]!=' '){
         if(input.buf[curr % INPUT_BUF]>='a'&&input.buf[curr % INPUT_BUF]<='z'){
           input.buf[curr % INPUT_BUF]-=('a'-'A');
@@ -276,18 +286,34 @@ consoleintr(int (*getc)(void))
       }
       break;
     case C('A'):  // Move to First of Line
-          input.last=input.e;
-          input.e=input.w;
-          input_size=(input.last-input.e>0)?input.last-input.e:input.last-input.e+INPUT_BUF;
+          curr=input.e;
+          while(input.e != input.w &&
+            input.buf[(input.e-1) % INPUT_BUF] != '\n'){
+            input.e--;
+          }
+          input_size=(curr-input.e>=0)?curr-input.e:curr-input.e+INPUT_BUF;
           move_cursor_back(input_size);
       break;
     default:
       if(c != 0 && input.e-input.r < INPUT_BUF){
         c = (c == '\r') ? '\n' : c;
+        curr=input.last;
+        input_size=(input.last-input.e>=0)?input.last-input.e:input.last-input.e+INPUT_BUF;
+        move_cursor_back(-input_size);
+        while(curr!=input.e){
+          curr--;
+          input.buf[(curr+1) % INPUT_BUF]=input.buf[curr % INPUT_BUF];
+          move_cursor_back(-1);
+          consputc(BACKSPACE);
+          consputc(input.buf[(curr+1) % INPUT_BUF]);
+          move_cursor_back(2);
+        }
         input.buf[input.e++ % INPUT_BUF] = c;
         consputc(c);
-        if(c == '\n' || c == C('D') || input.e == input.r+INPUT_BUF){
-          input.w = input.e;
+        input.last++;
+        if(c == '\n' || c == C('D') || input.last == input.r+INPUT_BUF){
+          input.w = input.last;
+          input.e=input.last;
           wakeup(&input.r);
         }
       }
