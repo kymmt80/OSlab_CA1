@@ -36,8 +36,12 @@ factor_to_file(int fd,int num){
     for(i=1;i<=num;i++){
         if(num%i==0){
             size=itos(i,c);
-            write(fd,c,size*sizeof(char));
-            write(fd," ",sizeof(char));
+            if(write(fd,c,size*sizeof(char))!=size*sizeof(char)){
+                printf(0,"factor: writing error\n");
+            }
+            if(write(fd," ",sizeof(char))!=sizeof(char)){
+                printf(0,"factor: writing error\n");
+            }
         }
     }
     write(fd,"\n",sizeof(char));
@@ -59,8 +63,6 @@ stoi(char* cnum){
 int
 main(int argc, char *argv[])
 {
-    //int factors[MAX_NUM];
-    //int i,j=0;
     int fd;
     char* cnum=argv[1];
     int num=stoi(cnum);
@@ -70,7 +72,9 @@ main(int argc, char *argv[])
 
     if((fd=open("factor_result.txt",O_CREATE|O_WRONLY))<0){
         printf(0,"factor: cannot open ‫‪factor_result.txt‬‬\n");
+        exit();
     }
+    
     factor_to_file(fd,num);
     close(fd);
     exit();
