@@ -70,6 +70,11 @@ main(int argc, char *argv[])
         exit();
     }
 
+    if((fd=open("factor_result.txt",O_WRONLY))>=0){
+        close(fd);
+        unlink("factor_result.txt");
+    }
+
     if((fd=open("factor_result.txt",O_CREATE|O_WRONLY))<0){
         printf(0,"factor: cannot open ‫‪factor_result.txt‬‬\n");
         exit();
