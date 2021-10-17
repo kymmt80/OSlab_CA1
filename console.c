@@ -239,8 +239,8 @@ consoleintr(int (*getc)(void))
       break;
     case C('H'): case '\x7f':  // Backspace
       if(input.e != input.w){
-        curr=input.e;
-        while(curr!=input.last){
+        curr=input.e-1;
+        while(curr!=input.last-1){
           input.buf[curr % INPUT_BUF]=input.buf[(curr+1) % INPUT_BUF];
           consputc(BACKSPACE);
           consputc(input.buf[(curr) % INPUT_BUF]);
